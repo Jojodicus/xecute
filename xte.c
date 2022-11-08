@@ -89,16 +89,19 @@ int main(int argc, char** argv) {
 
     int uid = getuid();
 
-    /* not privileged */
-    if (uid && uid != XID) {
-        exit(uid);
-    }
+    /* already root? */
+    if (uid) {
+        /* not privileged */
+        if (uid != XID) {
+            exit(uid);
+        }
 
-    /* validation */
-    if (SESSION_TIME && !check_session()) {
-        /* get password and create new session */
-        check_password(uid);
-        create_session();
+        /* validation */
+        if (SESSION_TIME && !check_session()) {
+            /* get password and create new session */
+            check_password(uid);
+            create_session();
+        }
     }
 
     run(argv+1);
