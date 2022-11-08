@@ -11,7 +11,10 @@
 #define XID 0
 #endif
 
-/* time in seconds on how long a persistent session should last */
+/* time in seconds on how long a persistent session should last
+ * 0:   never ask for password
+ * <0:  always ask for password
+ */
 #ifndef SESSION_TIME
 #define SESSION_TIME (5*60)
 #endif
@@ -31,6 +34,11 @@ void run(char **argv) {
 
 /* test if still in valid session */
 int check_session() {
+    /* session enabled? */
+    if (SESSION_TIME < 0) { // could be macro'd
+        return 0;
+    }
+
     /* open file */
     FILE* fs = fopen(SESSION_FILE, "r");
     if (!fs) {
@@ -55,6 +63,11 @@ void check_password(int uid) {
 
 /* write new session file */
 void create_session() {
+    /* no session file necessary */
+    if (SESSION_TIME < 0) { // could be macro'd
+        return;
+    }
+
     /* open file */
     FILE* fs = fopen(SESSION_FILE, "w");
     if (!fs) {
@@ -82,7 +95,7 @@ int main(int argc, char** argv) {
     }
 
     /* validation */
-    if (!check_session()) {
+    if (SESSION_TIME && !check_session()) {
         /* get password and create new session */
         check_password(uid);
         create_session();
