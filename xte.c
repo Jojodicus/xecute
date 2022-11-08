@@ -11,12 +11,15 @@
 #define XID 0
 #endif
 
-// /* time in seconds on how long a persistent session should last */
-// #ifndef SESSION_TIME
-// #define SESSION_TIME (5*60)
-// #endif
+/* time in seconds on how long a persistent session should last */
+#ifndef SESSION_TIME
+#define SESSION_TIME (5*60)
+#endif
 
-// #define SESSION_FILE "/run/xte.sess"
+/* path where the session file should be stored */
+#ifndef SESSION_FILE
+#define SESSION_FILE "/run/xte.sess"
+#endif
 
 /* run program with root privileges */
 void run(char **argv) {
@@ -26,25 +29,42 @@ void run(char **argv) {
     exit(69);
 }
 
-// /* test if still in valid session */
-// int check_session() {
-//     /* open file */
-//     FILE* fs = fopen(SESSION_FILE, "r");
-//     if (!fs) {
-//         return 0;
-//     }
+/* test if still in valid session */
+int check_session() {
+    /* open file */
+    FILE* fs = fopen(SESSION_FILE, "r");
+    if (!fs) {
+        return 0;
+    }
 
-//     /* read session data */
-//     unsigned long session_start;
-//     fscanf(fs, "%lu", &session_start);
+    /* read session data */
+    unsigned long session_start;
+    fscanf(fs, "%lu", &session_start);
 
-//     /* check if still in valid session */
-//     return time(NULL) - session_start < SESSION_TIME;
-// }
+    fclose(fs);
 
-/* get password and create new session */
-int check_password(int uid) {
-    return 0;
+    /* check if still in valid session */
+    return time(NULL) - session_start < SESSION_TIME;
+}
+
+/* get user input and compare with password */
+void check_password(int uid) {
+    // TODO
+    exit(42);
+}
+
+/* write new session file */
+void create_session() {
+    /* open file */
+    FILE* fs = fopen(SESSION_FILE, "w");
+    if (!fs) {
+        return;
+    }
+
+    /* write current unix time */
+    fprintf(fs, "%lu", time(NULL));
+
+    fclose(fs);
 }
 
 int main(int argc, char** argv) {
@@ -61,10 +81,12 @@ int main(int argc, char** argv) {
         exit(uid);
     }
 
-    // /* validation */
-    // if (!(check_session() || check_password(uid))) {
-    //     exit(EXIT_FAILURE);
-    // }
+    /* validation */
+    if (!check_session()) {
+        /* get password and create new session */
+        check_password(uid);
+        create_session();
+    }
 
     run(argv+1);
 }
