@@ -96,17 +96,20 @@ void check_password(const char* pname, int uid) {
     printf("[%s] - password: ", pname);
     fflush(stdout);
 
-    /* read password input */
-    char input[BUFFERSIZE];
-    read_password(input);
-    putchar('\n');
-    fflush(stdout);
 
-    /* get hashed user pw and hash input */
+    /* get hashed user pw */
     struct passwd* pw = getpwuid(uid);
    	struct spwd* shadowEntry = getspnam(pw->pw_name);
+
+    /* read password input and hash it */
+    char input[BUFFERSIZE];
+    read_password(input);
     char* hashed_pw = crypt(input, shadowEntry->sp_pwdp);
+
+    /* cleanup */
     memset(input, 1337, BUFFERSIZE);
+    putchar('\n');
+    fflush(stdout);
 
     /* compare hashes */
     if (strcmp(shadowEntry->sp_pwdp, hashed_pw)) {
