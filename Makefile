@@ -1,7 +1,9 @@
 .phony: all clean install uninstall
 
 CC = gcc
-CFLAGS = -std=c99 -O3 -march=native -pipe -pedantic -Wall -s -D_FORTIFY_SOURCE=1
+CFLAGS = -std=c99 -pipe -pedantic -Wall
+DFLAGS = -O0 -g
+RFLAGS = -O3 -march=native -s -D_FORTIFY_SOURCE=1
 LDFLAGS = -lcrypt
 
 all: xte
@@ -15,8 +17,11 @@ install: xte
 uninstall:
 	rm -f /usr/bin/xte
 
+debug: xte.c
+	$(CC) $(CFLAGS) $(DFLAGS) $(LDFLAGS) -DXID=$(shell id -u) -o xte $^
+
 xte: xte.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -DXID=$(shell id -u) -o $@ $^
+	$(CC) $(CFLAGS) $(RFLAGS) $(LDFLAGS) -DXID=$(shell id -u) -o $@ $^
 
 clean:
-	rm -f $(BIN)
+	rm -f xte
