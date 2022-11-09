@@ -1,13 +1,13 @@
-// TODO sort and cleanup includes
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <time.h>
-#include <crypt.h>
+#include <pwd.h>
 #include <shadow.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
-#include <pwd.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <crypt.h>
 
 /* id of privileged user */
 #ifndef XID
