@@ -82,7 +82,7 @@ void read_password(char *buffer) {
     tcsetattr( STDIN_FILENO, TCSANOW, &newt);
 
     /* reading the password from the console */
-    while ((c = getchar())!= '\n' && c != EOF && i < BUFFERSIZE){
+    while ((c = getchar())!= '\n' && c != EOF && i < BUFFERSIZE - 1){
         buffer[i++] = c;
     }
     buffer[i] = '\0';
