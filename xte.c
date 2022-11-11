@@ -16,7 +16,7 @@
 
 /* time in seconds on how long a persistent session should last
  * 0:   never ask for password
- * <0:  always ask for password
+ * <0:  always ask for password (also no timeout)
  */
 #ifndef SESSION_TIME
 #define SESSION_TIME (5*60)
@@ -30,6 +30,16 @@
 /* size of input buffer */
 #ifndef BUFFERSIZE
 #define BUFFERSIZE 128
+#endif
+
+/* how many tries the user has */
+#ifndef MAXTRIES
+#define MAXTRIES 3
+#endif
+
+/* how long the user is timeouted if not successfully authenticated */
+#ifndef TIMEOUT
+#define TIMEOUT 60
 #endif
 
 /* run program with root privileges */
@@ -54,15 +64,25 @@ int check_session() {
     }
 
     /* read session data */
+    char locked = fgetc(fs);
     unsigned long session_start;
-    if (fscanf(fs, "%lu", &session_start) != 1) {
+    int rv = fscanf(fs, "%lu", &session_start);
+
+    fclose(fs);
+    if (locked == EOF || rv != 1) {
         return 0;
     }
 
-    fclose(fs);
+    time_t now = time(NULL);
+
+    /* check if timeouted */
+    if (locked == '-' && now < session_start + TIMEOUT) {
+        printf("timeouted, try again in %lu seconds.\n", session_start + TIMEOUT - now);
+        exit(7);
+    }
 
     /* check if still in valid session */
-    return time(NULL) - session_start < SESSION_TIME;
+    return locked == '+' && time(NULL) - session_start < SESSION_TIME;
 }
 
 /* read password from stdin */
@@ -91,36 +111,9 @@ void read_password(char *buffer) {
     tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
 }
 
-/* get user input and compare with password */
-void check_password(const char* pname, int uid) {
-    printf("[%s] - password: ", pname);
-    fflush(stdout);
-
-
-    /* get hashed user pw */
-    struct passwd* pw = getpwuid(uid);
-   	struct spwd* shadowEntry = getspnam(pw->pw_name);
-
-    /* read password input and hash it */
-    char input[BUFFERSIZE];
-    read_password(input);
-    char* hashed_pw = crypt(input, shadowEntry->sp_pwdp);
-
-    /* cleanup */
-    memset(input, 1337, BUFFERSIZE);
-    putchar('\n');
-    fflush(stdout);
-
-    /* compare hashes */
-    if (strcmp(shadowEntry->sp_pwdp, hashed_pw)) {
-        sleep(3);
-        printf("wrong password\n");
-        exit(42);
-    }
-}
-
 /* write new session file */
-void create_session() {
+void create_session(char valid) {
+    // TODO: always password -> activate timeout as well?
     /* no session file necessary */
     if (SESSION_TIME < 0) { // could be macro'd
         return;
@@ -133,9 +126,46 @@ void create_session() {
     }
 
     /* write current unix time */
-    fprintf(fs, "%lu", time(NULL));
+    fprintf(fs, "%c%lu", valid, time(NULL));
 
     fclose(fs);
+}
+
+/* get user input and compare with password */
+void check_password(const char* pname, int uid) {
+    int tries = 0;
+    while (tries < MAXTRIES) {
+        printf("[%s] - password: ", pname);
+        fflush(stdout);
+
+        /* get hashed user pw */
+        struct passwd* pw = getpwuid(uid);
+        struct spwd* shadowEntry = getspnam(pw->pw_name);
+
+        /* read password input and hash it */
+        char input[BUFFERSIZE];
+        read_password(input);
+        char* hashed_pw = crypt(input, shadowEntry->sp_pwdp);
+
+        /* cleanup */
+        memset(input, 1337, BUFFERSIZE);
+        putchar('\n');
+        fflush(stdout);
+
+        /* compare hashes */
+        if (!strcmp(shadowEntry->sp_pwdp, hashed_pw)) {
+            /* success */
+            return;
+        }
+
+        sleep(3);
+        printf("wrong password\n");
+        tries++;
+    }
+
+    /* too many tries */
+    create_session('-');
+    exit(42);
 }
 
 int main(int argc, char** argv) {
@@ -158,7 +188,7 @@ int main(int argc, char** argv) {
         if (SESSION_TIME && !check_session()) {
             /* get password and create new session */
             check_password(*argv, uid);
-            create_session();
+            create_session('+');
         }
     }
 
