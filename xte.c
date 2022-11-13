@@ -16,7 +16,7 @@
 
 /* time in seconds on how long a persistent session should last
  * 0:   never ask for password
- * <0:  always ask for password (also no timeout)
+ * <0:  always ask for password
  */
 #ifndef SESSION_TIME
 #define SESSION_TIME (5*60)
@@ -37,7 +37,7 @@
 #define MAXTRIES 3
 #endif
 
-/* how long the user is timeouted if not successfully authenticated */
+/* how long the user is timeouted if not successfully authenticated (0 to disable) */
 #ifndef TIMEOUT
 #define TIMEOUT 60
 #endif
@@ -52,11 +52,6 @@ void run(char **argv) {
 
 /* test if still in valid session */
 int check_session() {
-    /* session enabled? */
-    if (SESSION_TIME < 0) { // could be macro'd
-        return 0;
-    }
-
     /* open file */
     FILE* fs = fopen(SESSION_FILE, "r");
     if (!fs) {
@@ -92,33 +87,27 @@ void read_password(char *buffer) {
     int c;
 
     /* saving the old settings of STDIN_FILENO and copy settings for resetting */
-    tcgetattr( STDIN_FILENO, &oldt);
+    tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
 
     /* setting the approriate bit in the termios struct */
     newt.c_lflag &= ~(ECHO);
 
     /* setting the new bits */
-    tcsetattr( STDIN_FILENO, TCSANOW, &newt);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
     /* reading the password from the console */
-    while ((c = getchar())!= '\n' && c != EOF && i < BUFFERSIZE - 1){
+    while ((c = getchar()) != '\n' && c != EOF && i < BUFFERSIZE - 1){
         buffer[i++] = c;
     }
     buffer[i] = '\0';
 
     /* resetting our old STDIN_FILENO */
-    tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
 /* write new session file */
 void create_session(char valid) {
-    // TODO: always password -> activate timeout as well?
-    /* no session file necessary */
-    if (SESSION_TIME < 0) { // could be macro'd
-        return;
-    }
-
     /* open file */
     FILE* fs = fopen(SESSION_FILE, "w");
     if (!fs) {
@@ -164,7 +153,9 @@ void check_password(const char* pname, int uid) {
     }
 
     /* too many tries */
-    create_session('-');
+    if (TIMEOUT) {
+        create_session('-');
+    }
     exit(42);
 }
 
@@ -188,7 +179,9 @@ int main(int argc, char** argv) {
         if (SESSION_TIME && !check_session()) {
             /* get password and create new session */
             check_password(*argv, uid);
-            create_session('+');
+            if (SESSION_TIME > 0) { // no session if always asking for password
+                create_session('+');
+            }
         }
     }
 
