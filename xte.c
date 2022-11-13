@@ -27,19 +27,20 @@
 #define SESSION_FILE "/run/xte.sess"
 #endif
 
-/* size of input buffer */
-#ifndef BUFFERSIZE
-#define BUFFERSIZE 128
-#endif
-
 /* how many tries the user has */
 #ifndef MAXTRIES
 #define MAXTRIES 3
 #endif
 
-/* how long the user is timeouted if not successfully authenticated (0 to disable) */
+/* how many seconds the user is timeouted if not successfully authenticated
+ * 0: disabled */
 #ifndef TIMEOUT
 #define TIMEOUT 60
+#endif
+
+/* size of input buffer */
+#ifndef BUFFERSIZE
+#define BUFFERSIZE 128
 #endif
 
 /* run program with root privileges */
