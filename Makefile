@@ -32,8 +32,7 @@ debug: xte.c
 	$(CC) $(CFLAGS) $(DFLAGS) $(LDFLAGS) $(DEFINES) -o xte $^
 
 install: xte
-	install -m 755 -o root -g root xte /usr/bin/xte
-	chmod u+s /usr/bin/xte
+	install -m 4755 -o root -g root xte /usr/bin/xte
 
 uninstall:
 	rm -f /usr/bin/xte
