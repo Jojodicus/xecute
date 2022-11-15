@@ -33,6 +33,7 @@ debug: xte.c
 
 install: xte
 	install -m 4755 -o root -g root xte /usr/bin/xte
+	ln -s /usr/bin/xte /usr/bin/xecute
 
 uninstall:
 	rm -f /usr/bin/xte
