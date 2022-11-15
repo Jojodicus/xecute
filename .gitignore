@@ -1,1 +1,6 @@
 xte
+
+# arch PKGBUILD temp files
+*tar.*
+/src
+/pkg
