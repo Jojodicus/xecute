@@ -32,11 +32,11 @@ debug: xte.c
 	$(CC) $(CFLAGS) $(DFLAGS) $(LDFLAGS) $(DEFINES) -o xte $^
 
 install: xte
-	install -m 4755 -o root -g root xte /usr/bin/xte
-	ln -s /usr/bin/xte /usr/bin/xecute
+	install -Dm 4755 -o root -g root xte $(DESTDIR)/usr/bin/xte
+	ln -s $(DESTDIR)/usr/bin/xte $(DESTDIR)/usr/bin/xecute
 
 uninstall:
-	rm -f /usr/bin/xte
+	rm -f $(DESTDIR)/usr/bin/xte
 
 clean:
 	rm -f xte
