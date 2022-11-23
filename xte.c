@@ -1,3 +1,4 @@
+#include <crypt.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <stdio.h>
@@ -6,8 +7,6 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <crypt.h>
 
 /* id of privileged user */
 #ifndef XID
@@ -33,7 +32,7 @@
 #endif
 
 /* how many seconds the user is timeouted if not successfully authenticated
- * 0: disabled */
+ * <=0: disabled */
 #ifndef TIMEOUT
 #define TIMEOUT 60
 #endif
@@ -123,8 +122,7 @@ void create_session(char valid) {
 
 /* get user input and compare with password */
 void check_password(const char* pname, int uid) {
-    int tries = 0;
-    while (tries < MAXTRIES) {
+    for (int tries = 0; tries < MAXTRIES; ++tries) {
         printf("[%s] - password: ", pname);
         fflush(stdout);
 
@@ -135,7 +133,7 @@ void check_password(const char* pname, int uid) {
         /* read password input and hash it */
         char input[BUFFERSIZE];
         read_password(input);
-        char* hashed_pw = crypt(input, shadowEntry->sp_pwdp);
+        char* hashed_pw = crypt(input, shadowEntry->sp_pwdp); // TODO: get at compile time
 
         /* cleanup */
         memset(input, 1337, BUFFERSIZE);
@@ -150,13 +148,12 @@ void check_password(const char* pname, int uid) {
 
         sleep(3);
         printf("wrong password\n");
-        tries++;
     }
 
     /* too many tries */
-    if (TIMEOUT) {
+    #if TIMEOUT > 0
         create_session('-');
-    }
+    #endif
     exit(42);
 }
 
@@ -177,13 +174,15 @@ int main(int argc, char** argv) {
         }
 
         /* validation */
-        if (SESSION_TIME && !check_session()) {
-            /* get password and create new session */
-            check_password(*argv, uid);
-            if (SESSION_TIME > 0) { // no session if always asking for password
-                create_session('+');
+        #if SESSION_TIME != 0
+            if (!check_session()) {
+                /* get password and create new session */
+                check_password(*argv, uid);
+                #if SESSION_TIME > 0 // no session if always asking for password
+                    create_session('+');
+                #endif
             }
-        }
+        #endif
     }
 
     run(argv+1);

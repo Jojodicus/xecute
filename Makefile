@@ -9,7 +9,7 @@ XID = $(shell id -u)
 # <0:	always ask for password
 SESSION_TIME = 300
 # path where the session file should be stored
-SESSION_FILE = \"/run/xte.sess\"
+SESSION_FILE = '"/run/xte.sess"'
 # how many tries the user has
 MAXTRIES = 3
 # how many seconds the user is timeouted if not successfully authenticated
