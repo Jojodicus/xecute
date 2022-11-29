@@ -15,6 +15,8 @@ MAXTRIES = 3
 # how many seconds the user is timeouted if not successfully authenticated
 # 0: disabled
 TIMEOUT = 60
+# if hitting an interrupt after a wrong password should trigger timeout
+SIGNAL_MITIGATION = 1
 
 ############
 
@@ -23,7 +25,7 @@ CFLAGS = -std=c99 -pipe -pedantic -Wall
 DFLAGS = -O0 -g
 RFLAGS = -O3 -march=native -s -D_FORTIFY_SOURCE=1
 LDFLAGS = -lcrypt
-DEFINES = -DXID=$(XID) -DSESSION_TIME=$(SESSION_TIME) -DSESSION_FILE=$(SESSION_FILE) -DMAXTRIES=$(MAXTRIES) -DTIMEOUT=$(TIMEOUT)
+DEFINES = -DXID=$(XID) -DSESSION_TIME=$(SESSION_TIME) -DSESSION_FILE=$(SESSION_FILE) -DMAXTRIES=$(MAXTRIES) -DTIMEOUT=$(TIMEOUT) -DSIGNAL_MITIATION=$(SIGNAL_MITIGATION)
 
 all: xte.c
 	$(CC) $(CFLAGS) $(RFLAGS) $(LDFLAGS) $(DEFINES) -o xte $^
@@ -33,7 +35,7 @@ debug: xte.c
 
 install: xte
 	install -Dm 4755 -o root -g root xte $(DESTDIR)/usr/bin/xte
-	ln -s $(DESTDIR)/usr/bin/xte $(DESTDIR)/usr/bin/xecute
+	ln -sf $(DESTDIR)/usr/bin/xte $(DESTDIR)/usr/bin/xecute
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/xte

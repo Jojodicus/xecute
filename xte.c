@@ -1,6 +1,7 @@
 #include <crypt.h>
 #include <pwd.h>
 #include <shadow.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,10 +38,50 @@
 #define TIMEOUT 60
 #endif
 
+/* if hitting an interrupt after a wrong password should trigger timeout */
+#ifndef SIGNAL_MITIGATION
+#define SIGNAL_MITIGATION 1
+#endif
+
 /* size of input buffer */
 #ifndef BUFFERSIZE
 #define BUFFERSIZE 128
 #endif
+
+static int tries = 0;
+
+/* write new session file */
+void create_session(char valid) {
+    /* open file */
+    FILE* fs = fopen(SESSION_FILE, "w");
+    if (!fs) {
+        return;
+    }
+
+    /* write current unix time */
+    fprintf(fs, "%c%lu", valid, time(NULL));
+
+    fclose(fs);
+}
+
+/* write timout session before quitting */
+void signal_handler(int signum) {
+    if (!(signum == SIGINT || signum == SIGTERM || signum == SIGKILL)) {
+        return;
+    }
+
+    if (tries > 0) {
+        create_session('-');
+    }
+
+    // TODO: fix
+    struct termios term;
+    tcgetattr(STDIN_FILENO, &term);
+    term.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
+
+    exit(1);
+}
 
 /* run program with root privileges */
 void run(char **argv) {
@@ -106,23 +147,16 @@ void read_password(char *buffer) {
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
-/* write new session file */
-void create_session(char valid) {
-    /* open file */
-    FILE* fs = fopen(SESSION_FILE, "w");
-    if (!fs) {
-        return;
-    }
-
-    /* write current unix time */
-    fprintf(fs, "%c%lu", valid, time(NULL));
-
-    fclose(fs);
-}
-
 /* get user input and compare with password */
 void check_password(const char* pname, int uid) {
-    for (int tries = 0; tries < MAXTRIES; ++tries) {
+    /* prevent signal exploitation */
+    #if TIMEOUT > 0
+        signal(SIGINT, signal_handler);
+        signal(SIGTERM, signal_handler);
+        signal(SIGKILL, signal_handler);
+    #endif
+
+    while (tries < MAXTRIES) {
         printf("[%s] - password: ", pname);
         fflush(stdout);
 
@@ -136,6 +170,7 @@ void check_password(const char* pname, int uid) {
         char* hashed_pw = crypt(input, shadowEntry->sp_pwdp); // TODO: get at compile time
 
         /* cleanup */
+        ++tries; // prevent signal exploitation
         memset(input, 1337, BUFFERSIZE);
         putchar('\n');
         fflush(stdout);
