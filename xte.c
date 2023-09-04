@@ -1,88 +1,133 @@
+#include <crypt.h>
 #include <pwd.h>
 #include <shadow.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <time.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#include <crypt.h>
+#include "config.h"
 
-/* id of privileged user */
-#ifndef XID
-#define XID 0
-#endif
+static int tries = 0;
 
-/* time in seconds on how long a persistent session should last
- * 0:   never ask for password
- * <0:  always ask for password
- */
-#ifndef SESSION_TIME
-#define SESSION_TIME (5*60)
-#endif
+enum session_status {
+    AUTHENTICATED,
+    TIMEOUTED
+};
 
-/* path where the session file should be stored */
-#ifndef SESSION_FILE
-#define SESSION_FILE "/run/xte.sess"
-#endif
+struct session {
+    time_t end_time;
+    enum session_status status;
+};
 
-/* how many tries the user has */
-#ifndef MAXTRIES
-#define MAXTRIES 3
-#endif
+/* helper for opening sessions */
+static FILE *open_session(const char *mode) {
+    #if SESSION_SHELL
+        char session_file[BUFFER_SIZE];
+        snprintf(session_file, BUFFER_SIZE, "%s.%d", SESSION_FILE, getppid());
+    #else
+        char *session_file = SESSION_FILE;
+    #endif
+    /* open file */
+    return fopen(session_file, mode);
+}
 
-/* how many seconds the user is timeouted if not successfully authenticated
- * 0: disabled */
-#ifndef TIMEOUT
-#define TIMEOUT 60
-#endif
+/* write new session file */
+static void create_session(enum session_status new_status) {
+    FILE* fs = open_session("w");
+    if (!fs) {
+        return;
+    }
 
-/* size of input buffer */
-#ifndef BUFFERSIZE
-#define BUFFERSIZE 128
-#endif
+    /* create session */
+    time_t now = time(NULL);
+    struct session new_session = {
+        .status = new_status,
+        .end_time = now
+    };
+    if (new_status == AUTHENTICATED) {
+        new_session.end_time += (SESSION_TIME);
+    }
+    if (new_status == TIMEOUTED) {
+        new_session.end_time += (TIMEOUT);
+    }
+
+    /* write time and status */
+    fwrite(&new_session, sizeof(struct session), 1, fs);
+
+    fclose(fs);
+}
+
+/* test if still in valid session */
+static int check_session(void) {
+    FILE* fs = open_session("r");
+    if (!fs) {
+        return 0;
+    }
+
+    /* read session data */
+    struct session old_session;
+    if (fread(&old_session, sizeof(struct session), 1, fs) != 1) {
+        return 0;
+    }
+
+    fclose(fs);
+
+    time_t now = time(NULL);
+
+    /* check if still in valid session */
+    if (old_session.status == AUTHENTICATED && now < old_session.end_time) {
+        return 1;
+    }
+
+    /* check if timeouted */
+    if (old_session.status == TIMEOUTED && now < old_session.end_time) {
+        printf("timeouted, try again in "RED"%lu"RESET" seconds.\n", old_session.end_time - now);
+        exit(7);
+    }
+
+    return 0;
+}
+
+/* helper for setting all signal handlers */
+static void set_all_signals(void (*handler)(int)) {
+    int signum;
+    for (signum = 1; signum < _NSIG; ++signum) {
+        signal(signum, handler);
+    }
+}
+
+static void signal_handler(int signum) {
+    #if SIGNAL_TIMEOUT
+        /* write timout session before quitting */
+        if (tries > 0) {
+            create_session(TIMEOUTED);
+        }
+    #endif
+
+    /* reset invisible terminal */
+    struct termios term;
+    tcgetattr(STDIN_FILENO, &term);
+    term.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
+
+    exit(1);
+}
 
 /* run program with root privileges */
-void run(char **argv) {
+static void run(char **argv) {
     if (!(setuid(0) || setgid(0))) {
         execvp(*argv, argv);
     }
     exit(69);
 }
 
-/* test if still in valid session */
-int check_session() {
-    /* open file */
-    FILE* fs = fopen(SESSION_FILE, "r");
-    if (!fs) {
-        return 0;
-    }
-
-    /* read session data */
-    char locked = fgetc(fs);
-    unsigned long session_start;
-    int rv = fscanf(fs, "%lu", &session_start);
-
-    fclose(fs);
-    if (locked == EOF || rv != 1) {
-        return 0;
-    }
-
-    time_t now = time(NULL);
-
-    /* check if timeouted */
-    if (locked == '-' && now < session_start + TIMEOUT) {
-        printf("timeouted, try again in %lu seconds.\n", session_start + TIMEOUT - now);
-        exit(7);
-    }
-
-    /* check if still in valid session */
-    return locked == '+' && time(NULL) - session_start < SESSION_TIME;
-}
-
 /* read password from stdin */
-void read_password(char *buffer) {
+static void read_password(char *buffer) {
     static struct termios oldt, newt;
     int i = 0;
     int c;
@@ -98,7 +143,7 @@ void read_password(char *buffer) {
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
     /* reading the password from the console */
-    while ((c = getchar()) != '\n' && c != EOF && i < BUFFERSIZE - 1){
+    while ((c = getchar()) != '\n' && c != EOF && i < BUFFER_SIZE - 1){
         buffer[i++] = c;
     }
     buffer[i] = '\0';
@@ -107,25 +152,13 @@ void read_password(char *buffer) {
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
-/* write new session file */
-void create_session(char valid) {
-    /* open file */
-    FILE* fs = fopen(SESSION_FILE, "w");
-    if (!fs) {
-        return;
-    }
-
-    /* write current unix time */
-    fprintf(fs, "%c%lu", valid, time(NULL));
-
-    fclose(fs);
-}
-
 /* get user input and compare with password */
-void check_password(const char* pname, int uid) {
-    int tries = 0;
-    while (tries < MAXTRIES) {
-        printf("[%s] - password: ", pname);
+static void check_password(const char* pname, int uid) {
+    /* prevent signal exploitation */
+    set_all_signals(signal_handler);
+
+    while (tries < MAX_TRIES) {
+        printf(BLU"["YEL"%s"BLU"]"RESET" - password: ", pname);
         fflush(stdout);
 
         /* get hashed user pw */
@@ -133,12 +166,13 @@ void check_password(const char* pname, int uid) {
         struct spwd* shadowEntry = getspnam(pw->pw_name);
 
         /* read password input and hash it */
-        char input[BUFFERSIZE];
+        char input[BUFFER_SIZE];
         read_password(input);
-        char* hashed_pw = crypt(input, shadowEntry->sp_pwdp);
+        char* hashed_pw = crypt(input, shadowEntry->sp_pwdp); // TODO: get at compile time
 
         /* cleanup */
-        memset(input, 1337, BUFFERSIZE);
+        ++tries; // prevent signal exploitation
+        memset(input, 1337, BUFFER_SIZE);
         putchar('\n');
         fflush(stdout);
 
@@ -148,15 +182,21 @@ void check_password(const char* pname, int uid) {
             return;
         }
 
+        /* penalty */
+        #if SIGNAL_MITIGATION
+            set_all_signals(SIG_IGN);
+        #endif
         sleep(3);
-        printf("wrong password\n");
-        tries++;
+        #if SIGNAL_MITIGATION
+            set_all_signals(signal_handler);
+        #endif
+        printf(RED"wrong password\n"RESET);
     }
 
     /* too many tries */
-    if (TIMEOUT) {
-        create_session('-');
-    }
+    #if TIMEOUT > 0
+        create_session(TIMEOUTED);
+    #endif
     exit(42);
 }
 
@@ -177,13 +217,15 @@ int main(int argc, char** argv) {
         }
 
         /* validation */
-        if (SESSION_TIME && !check_session()) {
-            /* get password and create new session */
-            check_password(*argv, uid);
-            if (SESSION_TIME > 0) { // no session if always asking for password
-                create_session('+');
+        #if SESSION_TIME != 0
+            if (!check_session()) {
+                /* get password and create new session */
+                check_password(*argv, uid);
+                #if SESSION_TIME > 0 // no session if always asking for password
+                    create_session(AUTHENTICATED);
+                #endif
             }
-        }
+        #endif
     }
 
     run(argv+1);
