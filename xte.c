@@ -28,6 +28,12 @@ struct session {
 static FILE *open_session(const char *mode) {
     #if SESSION_SHELL
         char session_file[BUFFER_SIZE];
+
+	/* avoid session for wrong pid (max pid_t is +18,446,744,073,709,551,615) */
+	if (BUFFER_SIZE - 27 < strlen(SESSION_FILE)){
+	    exit(161);
+	}
+
         snprintf(session_file, BUFFER_SIZE, "%s.%d", SESSION_FILE, getppid());
     #else
         char *session_file = SESSION_FILE;
