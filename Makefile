@@ -32,6 +32,6 @@ clean:
 	rm -f xte
 
 xte: xte.c config.h
-	$(CC) $(CFLAGS) $(RFLAGS) $(LDFLAGS) $(DEFINES) -o $@ $<
+	$(CC) $(CFLAGS) $(RFLAGS) $(DEFINES) -o $@ $< $(LDFLAGS)
 
 .phony: all clean install uninstall
