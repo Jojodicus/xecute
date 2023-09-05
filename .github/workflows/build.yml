@@ -15,5 +15,5 @@ jobs:
     - uses: actions/checkout@v3
     - name: make
       run: |
-        sudo apt install -y libcrypt1
+        sudo apt install -y libcrypt-dev
         make
