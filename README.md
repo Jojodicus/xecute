@@ -6,6 +6,8 @@ I do not guarantee the safety and/or security of this program, everything you do
 
 ## Installation
 
+Requires `libxcrypt` or a libc with encryption support (part of the XSI option group).
+
 ```
 git clone https://github.com/Jojodicus/xecute
 cd xecute
@@ -13,7 +15,7 @@ make
 su -c "make install"
 ```
 
-to uninstall:
+To uninstall:
 
 ```
 su -c "make uninstall"

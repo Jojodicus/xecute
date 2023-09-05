@@ -1,4 +1,7 @@
+#if _XOPEN_CRYPT >= 0
 #include <crypt.h>
+#endif
+
 #include <pwd.h>
 #include <shadow.h>
 #include <signal.h>
