@@ -1,4 +1,4 @@
-#if _XOPEN_CRYPT >= 0
+#if !(defined(_XOPEN_CRYPT) && (_XOPEN_CRYPT != -1))
 #include <crypt.h>
 #endif
 
