@@ -5,13 +5,15 @@
 
 # id of privileged user
 XID = $(shell id -u)
+# number of digits for the maximum allowed process id
+PID_MAX_DIGITS = $(shell cat /proc/sys/kernel/pid_max | wc -m)
 
-DEFINES = -DXID=$(XID) # add options here if desired
+DEFINES = -DXID=$(XID) -DPID_MAX_DIGITS=$(PID_MAX_DIGITS) # add options here if desired
 
 ############
 
 CC = gcc
-CFLAGS = -std=c99 -pipe -pedantic -Wall
+CFLAGS = -std=c99 -pipe -pedantic -Wall -Werror=vla
 DFLAGS = -O0 -g
 RFLAGS = -O3 -march=native -s -D_FORTIFY_SOURCE=1
 LDFLAGS = -lcrypt

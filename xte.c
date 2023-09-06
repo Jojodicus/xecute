@@ -30,14 +30,12 @@ struct session {
 /* helper for opening sessions */
 static FILE *open_session(const char *mode) {
     #if SESSION_SHELL
-        char session_file[BUFFER_SIZE];
+        /* ideal buffer size is calculated at compile-time */
+        size_t buffer_size = sizeof(SESSION_FILE) + PID_MAX_DIGITS + 2;
+        /* avoid vla error */
+        char session_file[sizeof(SESSION_FILE) + PID_MAX_DIGITS + 2];
 
-	/* avoid session for wrong pid (max pid_t is +18,446,744,073,709,551,615) */
-	if (BUFFER_SIZE - 27 < strlen(SESSION_FILE)){
-	    exit(161);
-	}
-
-        snprintf(session_file, BUFFER_SIZE, "%s.%d", SESSION_FILE, getppid());
+        snprintf(session_file, buffer_size, "%s.%d", SESSION_FILE, getppid());
     #else
         char *session_file = SESSION_FILE;
     #endif

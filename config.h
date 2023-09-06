@@ -50,6 +50,12 @@
 #define BUFFER_SIZE 128
 #endif
 
+/* maximum process-id allowed */
+#ifndef PID_MAX_DIGITS
+/* roughly 3 digits per byte */
+#define PID_MAX_DIGITS (sizeof(pid_t) * 3)
+#endif
+
 /* some colors for nice looking prompts */
 #ifndef DISABLE_COLOR
 #define RED   "\x1B[31m"
